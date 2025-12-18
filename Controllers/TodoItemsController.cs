@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using TodoApi.Models;
+using TodoApi.Repositories;
 
 namespace TodoApi.Controllers
 {
@@ -7,35 +8,79 @@ namespace TodoApi.Controllers
     [ApiController]
     public class TodoItemsController : ControllerBase
     {
-        private static readonly List<TodoItem> _items = new()
+        private readonly ITodoItemRepository _repository;
+
+        public TodoItemsController(ITodoItemRepository repository)
         {
-            new() { Id = 1, Title = "Купить молоко", Description = "2 литра" },
-            new() { Id = 2, Title = "Подготовить отчёт", Description = "К завтрашнему дню", IsCompleted = true },
-            new() { Id = 3, Title = "Позвонить маме", Description = "Вечером" },
-            new() { Id = 4, Title = "Сходить в спортзал", Description = "18:00" },
-            new() { Id = 5, Title = "Прочитать книгу", Description = "Глава 5", IsCompleted = true }
-        };
+            _repository = repository;
+        }
 
         [HttpGet]
-        public ActionResult<IEnumerable<TodoItem>> Get()
+        public async Task<ActionResult<List<TodoItem>>> GetTodoItems()
         {
-            return Ok(_items);
+            var items = await _repository.GetAllAsync();
+            return Ok(items);
+        }
+
+        [HttpGet("completed")]
+        public async Task<ActionResult<List<TodoItem>>> GetCompleted()
+        {
+            var items = await _repository.GetCompletedAsync();
+            return Ok(items);
+        }
+
+        [HttpGet("pending")]
+        public async Task<ActionResult<List<TodoItem>>> GetPending()
+        {
+            var items = await _repository.GetPendingAsync();
+            return Ok(items);
         }
 
         [HttpGet("{id}")]
-        public ActionResult<TodoItem> Get(int id)
+        public async Task<ActionResult<TodoItem>> GetTodoItem(int id)
         {
-            var item = _items.FirstOrDefault(i => i.Id == id);
-            return item == null ? NotFound() : Ok(item);
+            var item = await _repository.GetByIdAsync(id);
+            if (item == null)
+            {
+                return NotFound();
+            }
+            return Ok(item);
         }
 
         [HttpPost]
-        public ActionResult<TodoItem> Post(TodoItem item)
+        public async Task<ActionResult<TodoItem>> PostTodoItem(TodoItem todoItem)
         {
-            item.Id = _items.Count > 0 ? _items.Max(i => i.Id) + 1 : 1;
-            item.CreatedAt = DateTime.Now;
-            _items.Add(item);
-            return CreatedAtAction(nameof(Get), new { id = item.Id }, item);
+            var createdItem = await _repository.CreateAsync(todoItem);
+            return CreatedAtAction(nameof(GetTodoItem), new { id = createdItem.Id }, createdItem);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutTodoItem(int id, TodoItem todoItem)
+        {
+            if (id != todoItem.Id)
+            {
+                return BadRequest();
+            }
+
+            if (!await _repository.ExistsAsync(id))
+            {
+                return NotFound();
+            }
+
+            await _repository.UpdateAsync(todoItem);
+            return NoContent();
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteTodoItem(int id)
+        {
+            if (!await _repository.ExistsAsync(id))
+            {
+                return NotFound();
+            }
+
+            await _repository.DeleteAsync(id);
+            return NoContent();
         }
     }
 }
