@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using TodoApi.Models;
-using TodoApi.Repositories;
+using TodoApi.DTOs;
+using TodoApi.Services;
 
 namespace TodoApi.Controllers
 {
@@ -8,78 +8,73 @@ namespace TodoApi.Controllers
     [ApiController]
     public class TodoItemsController : ControllerBase
     {
-        private readonly ITodoItemRepository _repository;
+        private readonly ITodoService _todoService;
 
-        public TodoItemsController(ITodoItemRepository repository)
+        public TodoItemsController(ITodoService todoService)
         {
-            _repository = repository;
+            _todoService = todoService;
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<TodoItem>>> GetTodoItems()
+        public async Task<ActionResult<List<TodoItemResponseDto>>> GetTodoItems()
         {
-            var items = await _repository.GetAllAsync();
+            var items = await _todoService.GetAllTodoItemsAsync();
             return Ok(items);
         }
 
         [HttpGet("completed")]
-        public async Task<ActionResult<List<TodoItem>>> GetCompleted()
+        public async Task<ActionResult<List<TodoItemResponseDto>>> GetCompleted()
         {
-            var items = await _repository.GetCompletedAsync();
+            var items = await _todoService.GetCompletedTodoItemsAsync();
             return Ok(items);
         }
 
         [HttpGet("pending")]
-        public async Task<ActionResult<List<TodoItem>>> GetPending()
+        public async Task<ActionResult<List<TodoItemResponseDto>>> GetPending()
         {
-            var items = await _repository.GetPendingAsync();
+            var items = await _todoService.GetPendingTodoItemsAsync();
             return Ok(items);
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<TodoItem>> GetTodoItem(int id)
+        public async Task<ActionResult<TodoItemResponseDto>> GetTodoItem(int id)
         {
-            var item = await _repository.GetByIdAsync(id);
+            var item = await _todoService.GetTodoItemByIdAsync(id);
             if (item == null)
             {
-                return NotFound();
+                return NotFound(new { message = $"Задача с ID {id} не найдена" });
             }
             return Ok(item);
         }
 
         [HttpPost]
-        public async Task<ActionResult<TodoItem>> PostTodoItem(TodoItem todoItem)
+        public async Task<ActionResult<TodoItemResponseDto>> PostTodoItem(TodoItemCreateDto todoItemCreateDto)
         {
-            var createdItem = await _repository.CreateAsync(todoItem);
+            var createdItem = await _todoService.CreateTodoItemAsync(todoItemCreateDto);
             return CreatedAtAction(nameof(GetTodoItem), new { id = createdItem.Id }, createdItem);
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutTodoItem(int id, TodoItem todoItem)
+        public async Task<IActionResult> PutTodoItem(int id, TodoItemCreateDto todoItemCreateDto)
         {
-            if (id != todoItem.Id)
+            var updatedItem = await _todoService.UpdateTodoItemAsync(id, todoItemCreateDto);
+            if (updatedItem == null)
             {
-                return BadRequest();
+                return NotFound(new { message = $"Задача с ID {id} не найдена" });
             }
 
-            if (!await _repository.ExistsAsync(id))
-            {
-                return NotFound();
-            }
-
-            await _repository.UpdateAsync(todoItem);
-            return NoContent();
+            return Ok(updatedItem);
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteTodoItem(int id)
         {
-            if (!await _repository.ExistsAsync(id))
+            var result = await _todoService.DeleteTodoItemAsync(id);
+            if (!result)
             {
-                return NotFound();
+                return NotFound(new { message = $"Задача с ID {id} не найдена" });
             }
 
-            await _repository.DeleteAsync(id);
             return NoContent();
         }
     }

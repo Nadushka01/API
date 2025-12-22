@@ -14,7 +14,6 @@ namespace TodoApi.Repositories
         };
 
         private int _nextId = 6;
-
         public Task<List<TodoItem>> GetAllAsync()
         {
             return Task.FromResult(_items);
